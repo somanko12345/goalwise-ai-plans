@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,6 +16,9 @@ import GoalSetup from "./pages/Onboarding/GoalSetup";
 
 // App Pages
 import Dashboard from "./pages/Dashboard/Dashboard";
+import Goals from "./pages/Goals/Goals";
+import GoalDetail from "./pages/Goals/GoalDetail";
+import GoalCreate from "./pages/Goals/GoalCreate";
 import BudgetAnalyzer from "./pages/Budget/BudgetAnalyzer";
 import InvestmentSuggestions from "./pages/Investments/InvestmentSuggestions";
 import NotFound from "./pages/NotFound";
@@ -40,6 +44,9 @@ const App = () => (
             {/* Dashboard Routes */}
             <Route path="/" element={<DashboardLayout />}>
               <Route path="dashboard" element={<Dashboard />} />
+              <Route path="goals" element={<Goals />} />
+              <Route path="goals/create" element={<GoalCreate />} />
+              <Route path="goals/:goalId" element={<GoalDetail />} />
               <Route path="budget" element={<BudgetAnalyzer />} />
               <Route path="investments" element={<InvestmentSuggestions />} />
               {/* Add more routes here */}
