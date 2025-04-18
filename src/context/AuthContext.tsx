@@ -18,10 +18,10 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users for demo purposes
+// Mock users for demo purposes - in a real app, this would be stored in a database
 const mockUsers = [
-  { email: "user@example.com", password: "password123", name: "Demo User" },
-  { email: "admin@goalsage.com", password: "admin123", name: "Admin User" }
+  { email: "user@example.com", password: "password123", name: "Demo User", id: "user-1" },
+  { email: "admin@goalsage.com", password: "admin123", name: "Admin User", id: "user-2" }
 ];
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -33,7 +33,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Check if user is stored in localStorage
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        // Verify the user exists in our mock database
+        const userExists = mockUsers.find(u => u.id === parsedUser.id);
+        
+        if (userExists) {
+          setUser(parsedUser);
+        } else {
+          // If user doesn't exist, clear localStorage
+          localStorage.removeItem("user");
+        }
+      } catch (error) {
+        // If JSON is invalid, clear localStorage
+        localStorage.removeItem("user");
+      }
     }
     setLoading(false);
   }, []);
@@ -52,18 +66,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     
     if (foundUser) {
       const userData = { 
-        id: `user-${Date.now()}`, 
+        id: foundUser.id, 
         email: foundUser.email, 
         name: foundUser.name 
       };
       
       localStorage.setItem("user", JSON.stringify(userData));
       setUser(userData);
+      setLoading(false);
     } else {
+      setLoading(false);
       throw new Error("Invalid credentials");
     }
-    
-    setLoading(false);
   };
 
   const signup = async (email: string, password: string, name: string) => {
@@ -84,12 +98,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
     
     // In a real app, you would create a user with your backend
-    const userData = { id: "user-" + Date.now(), email, name };
-    localStorage.setItem("user", JSON.stringify(userData));
-    setUser(userData);
+    const newUserId = `user-${Date.now()}`;
+    const userData = { id: newUserId, email, name };
     
     // Add to mock users (this won't persist on reload, just for demo)
-    mockUsers.push({ email, password, name });
+    mockUsers.push({ email, password, name, id: newUserId });
+    
+    localStorage.setItem("user", JSON.stringify(userData));
+    setUser(userData);
     
     setLoading(false);
   };
@@ -97,6 +113,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const logout = () => {
     localStorage.removeItem("user");
     setUser(null);
+    toast({
+      title: "Logged out",
+      description: "You have been successfully logged out.",
+      variant: "default"
+    });
   };
 
   return (

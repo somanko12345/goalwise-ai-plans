@@ -21,6 +21,7 @@ import GoalDetail from "./pages/Goals/GoalDetail";
 import GoalCreate from "./pages/Goals/GoalCreate";
 import BudgetAnalyzer from "./pages/Budget/BudgetAnalyzer";
 import InvestmentSuggestions from "./pages/Investments/InvestmentSuggestions";
+import Insights from "./pages/Insights/Insights";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -49,6 +50,7 @@ const App = () => (
               <Route path="goals/:goalId" element={<GoalDetail />} />
               <Route path="budget" element={<BudgetAnalyzer />} />
               <Route path="investments" element={<InvestmentSuggestions />} />
+              <Route path="insights" element={<Insights />} />
               {/* Add more routes here */}
             </Route>
             
