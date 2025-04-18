@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -114,8 +113,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     localStorage.removeItem("user");
     setUser(null);
     toast({
-      title: "Logged out",
-      description: "You have been successfully logged out.",
+      title: "Logged out successfully",
+      description: "You have been securely logged out.",
       variant: "default"
     });
   };

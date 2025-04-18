@@ -1,6 +1,5 @@
-
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { 
@@ -19,6 +18,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Sparkles } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface SidebarNavProps extends React.HTMLAttributes<HTMLElement> {
   isMobile?: boolean;
@@ -59,7 +59,14 @@ function DesktopSidebar() {
 function SidebarNav({ isMobile = false, className }: SidebarNavProps) {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
   const navItems = [
     {
       title: "Dashboard",
@@ -136,17 +143,11 @@ function SidebarNav({ isMobile = false, className }: SidebarNavProps) {
             <p className="text-xs text-sidebar-foreground/60">{user?.email}</p>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <Link to="/settings">
-            <Button variant="outline" className="w-full text-sidebar-foreground border-sidebar-border hover:bg-sidebar-accent/50">
-              <Settings className="mr-2 h-4 w-4" />
-              Settings
-            </Button>
-          </Link>
+        <div className="grid gap-2">
           <Button 
-            variant="outline" 
-            className="w-full text-sidebar-foreground border-sidebar-border hover:bg-sidebar-accent/50"
-            onClick={() => logout()}
+            variant="destructive" 
+            className="w-full"
+            onClick={handleLogout}
           >
             <LogOut className="mr-2 h-4 w-4" />
             Logout
