@@ -20,7 +20,8 @@ import {
   Clock,
   Edit,
   Settings,
-  TrendingUp
+  TrendingUp,
+  Plus
 } from "lucide-react";
 
 // Mock goals data
