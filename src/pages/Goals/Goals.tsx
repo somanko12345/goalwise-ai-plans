@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -14,42 +14,118 @@ import {
   Plus, 
   Target, 
   ArrowRight,
-  Sparkles
+  Sparkles,
+  Loader2
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
 
-// Using the same mock data from Dashboard for consistency
-const mockGoals = [
-  {
-    id: "goal1",
-    name: "Trip to Europe",
-    target: 200000,
-    current: 45000,
-    timeline: "May 2025",
-    category: "Travel",
-    progress: 22.5,
-    status: "on-track",
-    monthlyContribution: 12000,
-    returns: 3.2
-  },
-  {
-    id: "goal2",
-    name: "MacBook Pro",
-    target: 150000,
-    current: 90000,
-    timeline: "Dec 2024",
-    category: "Tech",
-    progress: 60,
-    status: "ahead",
-    monthlyContribution: 15000,
-    returns: 2.8
-  }
-];
+interface Goal {
+  id: string;
+  name: string;
+  target: number;
+  current_amount: number;
+  timeline: string;
+  category: string;
+  progress: number;
+  status: "on-track" | "ahead" | "behind";
+  initial_amount: number;
+  created_at: string;
+}
+
+const calculateProgress = (current: number, target: number) => {
+  return Math.min(Math.round((current / target) * 100), 100);
+};
+
+const calculateStatus = (current: number, target: number, timeline: Date) => {
+  const progress = calculateProgress(current, target);
+  const now = new Date();
+  const totalDuration = timeline.getTime() - new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).getTime();
+  const elapsed = now.getTime() - (timeline.getTime() - totalDuration);
+  const expectedProgress = Math.min(Math.round((elapsed / totalDuration) * 100), 100);
+
+  if (progress >= expectedProgress + 10) return "ahead";
+  if (progress <= expectedProgress - 10) return "behind";
+  return "on-track";
+};
 
 const Goals = () => {
-  const [goals, setGoals] = useState(mockGoals);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchGoals = async () => {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from("goals")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+
+        // Process the data to calculate additional fields
+        const processedGoals = data.map(goal => {
+          const timelineDate = new Date(goal.timeline);
+          const progress = calculateProgress(goal.current_amount, goal.target);
+          const status = calculateStatus(goal.current_amount, goal.target, timelineDate);
+
+          return {
+            ...goal,
+            progress,
+            status
+          };
+        });
+
+        setGoals(processedGoals);
+      } catch (error: any) {
+        console.error("Error fetching goals:", error);
+        toast({
+          title: "Could not load goals",
+          description: error.message || "An error occurred while loading your goals.",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchGoals();
+  }, [user, toast]);
+
+  if (!user) {
+    return (
+      <Card className="border-dashed">
+        <CardContent className="flex flex-col items-center justify-center py-10">
+          <Target className="h-10 w-10 text-muted-foreground mb-4" />
+          <h3 className="font-medium text-center mb-1">Authentication Required</h3>
+          <p className="text-sm text-muted-foreground text-center mb-4">
+            Please log in to view and manage your goals
+          </p>
+          <Button onClick={() => navigate("/login")}>
+            Log In
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -84,7 +160,7 @@ const Goals = () => {
                   goal.status === "ahead" ? "Ahead" : "Behind"}
                 </span>
               </div>
-              <CardDescription>{goal.category} • Due by {goal.timeline}</CardDescription>
+              <CardDescription>{goal.category} • Due by {new Date(goal.timeline).toLocaleDateString()}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -96,14 +172,14 @@ const Goals = () => {
                   <Progress value={goal.progress} className="h-2" />
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">₹{goal.current.toLocaleString()} saved</span>
+                  <span className="text-muted-foreground">₹{goal.current_amount.toLocaleString()} saved</span>
                   <span>₹{goal.target.toLocaleString()} goal</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between pt-2">
                   <div>
-                    <p className="text-sm font-medium">₹{goal.monthlyContribution.toLocaleString()}</p>
-                    <p className="text-xs text-muted-foreground">Monthly contribution</p>
+                    <p className="text-sm font-medium">₹{goal.initial_amount.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">Initial amount</p>
                   </div>
                   <Link to={`/goals/${goal.id}`}>
                     <Button variant="ghost" size="sm">
@@ -135,22 +211,26 @@ const Goals = () => {
       </div>
 
       {/* Quick Action Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-yellow-500" />
-            Goal Insights
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p>Based on your current goals and savings rate, you could reach your first goal by <span className="font-medium">December 2024</span>.</p>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm">Optimize Savings</Button>
-            <Button variant="outline" size="sm">Adjust Timeline</Button>
-            <Button variant="outline" size="sm">Get Investment Tips</Button>
-          </div>
-        </CardContent>
-      </Card>
+      {goals.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-yellow-500" />
+              Goal Insights
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p>Based on your current goals and savings rate, you could reach your first goal by <span className="font-medium">
+              {goals.length > 0 ? new Date(goals[0].timeline).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : "December 2024"}
+            </span>.</p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm">Optimize Savings</Button>
+              <Button variant="outline" size="sm">Adjust Timeline</Button>
+              <Button variant="outline" size="sm">Get Investment Tips</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

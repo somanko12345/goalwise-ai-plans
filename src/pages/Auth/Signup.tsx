@@ -6,13 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Loader2 } from "lucide-react";
 
 const Signup = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { signup, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -28,16 +29,28 @@ const Signup = () => {
       });
       return;
     }
+
+    setIsSubmitting(true);
     
     try {
       await signup(email, password, name);
+      
+      toast({
+        title: "Account created",
+        description: "Your account has been created successfully.",
+        variant: "default"
+      });
+      
+      // In a real app with email verification, you might want to redirect to a verification page
       navigate("/onboarding");
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Signup failed",
-        description: "Please try again with different credentials.",
+        description: error.message || "Please try again with different credentials.",
         variant: "destructive"
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -105,8 +118,17 @@ const Signup = () => {
               </div>
             </CardContent>
             <CardFooter className="flex-col space-y-4">
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Creating account..." : "Create account"}
+              <Button 
+                type="submit" 
+                className="w-full" 
+                disabled={loading || isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating account...
+                  </>
+                ) : "Create account"}
               </Button>
               <p className="text-center text-sm text-muted-foreground">
                 Already have an account?{" "}

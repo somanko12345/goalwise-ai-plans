@@ -32,6 +32,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
+import { useState } from "react";
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -57,6 +60,8 @@ type FormValues = z.infer<typeof formSchema>;
 const GoalCreate = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -70,17 +75,53 @@ const GoalCreate = () => {
     },
   });
 
-  const onSubmit = (data: FormValues) => {
-    console.log("Form data:", data);
+  const onSubmit = async (data: FormValues) => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to create a goal.",
+        variant: "destructive"
+      });
+      navigate("/login");
+      return;
+    }
     
-    toast({
-      title: "Goal created",
-      description: `${data.name} has been created successfully.`,
-    });
+    setIsSubmitting(true);
     
-    setTimeout(() => {
-      navigate("/goals");
-    }, 1500);
+    try {
+      // Parse the timeline string to a Date object
+      const timelineDate = new Date(data.timeline);
+      
+      const { error } = await supabase.from("goals").insert({
+        user_id: user.id,
+        name: data.name,
+        category: data.category,
+        target: data.target,
+        timeline: timelineDate.toISOString(),
+        description: data.description || null,
+        initial_amount: data.initialAmount,
+        current_amount: data.initialAmount // Initially, current amount equals initial amount
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Goal created",
+        description: `${data.name} has been created successfully.`,
+      });
+      
+      setTimeout(() => {
+        navigate("/goals");
+      }, 1500);
+    } catch (error: any) {
+      toast({
+        title: "Failed to create goal",
+        description: error.message || "An error occurred while creating your goal.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -220,7 +261,9 @@ const GoalCreate = () => {
                 <Button type="button" variant="outline" onClick={() => navigate("/goals")}>
                   Cancel
                 </Button>
-                <Button type="submit">Create Goal</Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Creating..." : "Create Goal"}
+                </Button>
               </div>
             </form>
           </Form>

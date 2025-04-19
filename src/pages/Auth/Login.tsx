@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Sparkles, User, Lock, ArrowRight, CheckCircle } from "lucide-react";
+import { Sparkles, User, Lock, ArrowRight, CheckCircle, Loader2 } from "lucide-react";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -28,10 +28,10 @@ const Login = () => {
         variant: "default"
       });
       navigate("/dashboard");
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Login failed",
-        description: "Please check your credentials and try again.",
+        description: error.message || "Please check your credentials and try again.",
         variant: "destructive"
       });
     } finally {
@@ -113,7 +113,12 @@ const Login = () => {
                 className="w-full bg-gradient-to-r from-primary to-ocean-500 hover:from-primary/90 hover:to-ocean-600 transition-all h-12 text-base"
                 disabled={loading || isSubmitting}
               >
-                {isSubmitting ? "Logging in..." : (
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Logging in...
+                  </>
+                ) : (
                   <>
                     Log in
                     <ArrowRight className="ml-2 h-5 w-5" />

@@ -1,126 +1,144 @@
+
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { User, Session } from "@supabase/supabase-js";
 
-type User = {
+type UserProfile = {
   id: string;
-  email: string;
   name: string;
 } | null;
 
 interface AuthContextType {
-  user: User;
+  user: UserProfile;
+  session: Session | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users for demo purposes - in a real app, this would be stored in a database
-const mockUsers = [
-  { email: "user@example.com", password: "password123", name: "Demo User", id: "user-1" },
-  { email: "admin@goalsage.com", password: "admin123", name: "Admin User", id: "user-2" }
-];
-
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<User>(null);
+  const [user, setUser] = useState<UserProfile>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    // Check if user is stored in localStorage
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        // Verify the user exists in our mock database
-        const userExists = mockUsers.find(u => u.id === parsedUser.id);
-        
-        if (userExists) {
-          setUser(parsedUser);
-        } else {
-          // If user doesn't exist, clear localStorage
-          localStorage.removeItem("user");
-        }
-      } catch (error) {
-        // If JSON is invalid, clear localStorage
-        localStorage.removeItem("user");
+  // Function to fetch user profile
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
+
+      if (error) {
+        console.error("Error fetching user profile:", error);
+        return null;
       }
+
+      return data;
+    } catch (error) {
+      console.error("Exception when fetching user profile:", error);
+      return null;
     }
-    setLoading(false);
+  };
+
+  useEffect(() => {
+    // Set up the auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, currentSession) => {
+        setSession(currentSession);
+
+        if (currentSession?.user) {
+          // Use setTimeout to prevent potential deadlocks with Supabase client
+          setTimeout(async () => {
+            const profile = await fetchUserProfile(currentSession.user.id);
+            setUser(profile);
+            setLoading(false);
+          }, 0);
+        } else {
+          setUser(null);
+          setLoading(false);
+        }
+      }
+    );
+
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+
+      if (currentSession?.user) {
+        // Use setTimeout to prevent potential deadlocks with Supabase client
+        setTimeout(async () => {
+          const profile = await fetchUserProfile(currentSession.user.id);
+          setUser(profile);
+          setLoading(false);
+        }, 0);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
-    // For demo purposes, we're just mocking authentication
     setLoading(true);
-    
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Check if user exists in our mock database
-    const foundUser = mockUsers.find(
-      u => u.email.toLowerCase() === email.toLowerCase() && u.password === password
-    );
-    
-    if (foundUser) {
-      const userData = { 
-        id: foundUser.id, 
-        email: foundUser.email, 
-        name: foundUser.name 
-      };
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       
-      localStorage.setItem("user", JSON.stringify(userData));
-      setUser(userData);
+      if (error) throw error;
+    } catch (error: any) {
       setLoading(false);
-    } else {
-      setLoading(false);
-      throw new Error("Invalid credentials");
+      throw new Error(error.message || "Login failed");
     }
   };
 
   const signup = async (email: string, password: string, name: string) => {
-    // For demo purposes, we're just mocking signup
     setLoading(true);
-    
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Check if email already exists
-    const existingUser = mockUsers.find(
-      u => u.email.toLowerCase() === email.toLowerCase()
-    );
-    
-    if (existingUser) {
+    try {
+      const { error } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: {
+          data: {
+            name
+          }
+        } 
+      });
+      
+      if (error) throw error;
+    } catch (error: any) {
       setLoading(false);
-      throw new Error("Email already in use");
+      throw new Error(error.message || "Signup failed");
     }
-    
-    // In a real app, you would create a user with your backend
-    const newUserId = `user-${Date.now()}`;
-    const userData = { id: newUserId, email, name };
-    
-    // Add to mock users (this won't persist on reload, just for demo)
-    mockUsers.push({ email, password, name, id: newUserId });
-    
-    localStorage.setItem("user", JSON.stringify(userData));
-    setUser(userData);
-    
-    setLoading(false);
   };
 
-  const logout = () => {
-    localStorage.removeItem("user");
-    setUser(null);
-    toast({
-      title: "Logged out successfully",
-      description: "You have been securely logged out.",
-      variant: "default"
-    });
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast({
+        title: "Logged out successfully",
+        description: "You have been securely logged out.",
+        variant: "default"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Logout failed",
+        description: error.message || "An error occurred during logout.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, session, loading, login, signup, logout }}>
       {children}
     </AuthContext.Provider>
   );
