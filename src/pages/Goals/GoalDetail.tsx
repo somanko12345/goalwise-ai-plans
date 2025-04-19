@@ -1,6 +1,6 @@
 
-import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -21,67 +21,91 @@ import {
   Edit,
   Settings,
   TrendingUp,
-  Plus
+  Plus,
+  Loader2
 } from "lucide-react";
-
-// Mock goals data
-const mockGoals = [
-  {
-    id: "goal1",
-    name: "Trip to Europe",
-    target: 200000,
-    current: 45000,
-    timeline: "May 2025",
-    category: "Travel",
-    progress: 22.5,
-    status: "on-track",
-    monthlyContribution: 12000,
-    returns: 3.2,
-    description: "Funding for a 10-day trip across Europe, including flights, accommodation, and spending money.",
-    createdAt: "2024-03-15",
-    milestones: [
-      { date: "2024-05-01", amount: 50000, label: "25% Complete" },
-      { date: "2024-09-01", amount: 100000, label: "50% Complete" },
-      { date: "2025-01-01", amount: 150000, label: "75% Complete" },
-      { date: "2025-05-01", amount: 200000, label: "Goal Complete" }
-    ],
-    transactions: [
-      { date: "2024-03-15", amount: 20000, type: "deposit", note: "Initial deposit" },
-      { date: "2024-03-28", amount: 12000, type: "deposit", note: "Monthly contribution" },
-      { date: "2024-04-15", amount: 13000, type: "deposit", note: "Extra savings" }
-    ]
-  },
-  {
-    id: "goal2",
-    name: "MacBook Pro",
-    target: 150000,
-    current: 90000,
-    timeline: "Dec 2024",
-    category: "Tech",
-    progress: 60,
-    status: "ahead",
-    monthlyContribution: 15000,
-    returns: 2.8,
-    description: "Saving for a new MacBook Pro with 16-inch screen and upgraded specs.",
-    createdAt: "2024-02-10",
-    milestones: [
-      { date: "2024-04-01", amount: 37500, label: "25% Complete" },
-      { date: "2024-07-01", amount: 75000, label: "50% Complete" },
-      { date: "2024-10-01", amount: 112500, label: "75% Complete" },
-      { date: "2024-12-15", amount: 150000, label: "Goal Complete" }
-    ],
-    transactions: [
-      { date: "2024-02-10", amount: 50000, type: "deposit", note: "Initial deposit" },
-      { date: "2024-02-28", amount: 15000, type: "deposit", note: "Monthly contribution" },
-      { date: "2024-03-28", amount: 15000, type: "deposit", note: "Monthly contribution" },
-      { date: "2024-04-15", amount: 10000, type: "deposit", note: "Bonus contribution" }
-    ]
-  }
-];
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
+import GoalAdvisor from "@/components/GoalAdvisor";
+import { useToast } from "@/hooks/use-toast";
 
 const GoalDetail = () => {
   const { goalId } = useParams();
-  const goal = mockGoals.find(g => g.id === goalId);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [goal, setGoal] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    const fetchGoal = async () => {
+      if (!user) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from("goals")
+          .select("*")
+          .eq("id", goalId)
+          .eq("user_id", user.id)
+          .single();
+          
+        if (error) throw error;
+        
+        // Calculate progress percentage
+        const progressPercent = data.target > 0 
+          ? Math.min(Math.round((data.current_amount / data.target) * 100), 100)
+          : 0;
+          
+        // Determine goal status based on timeline and progress
+        const targetDate = new Date(data.timeline);
+        const today = new Date();
+        const totalDays = (targetDate.getTime() - new Date(data.created_at).getTime()) / (1000 * 60 * 60 * 24);
+        const daysElapsed = (today.getTime() - new Date(data.created_at).getTime()) / (1000 * 60 * 60 * 24);
+        const expectedProgress = totalDays > 0 ? (daysElapsed / totalDays) * 100 : 0;
+        
+        let status: "on-track" | "ahead" | "behind" = "on-track";
+        if (progressPercent > expectedProgress + 5) {
+          status = "ahead";
+        } else if (progressPercent < expectedProgress - 5) {
+          status = "behind";
+        }
+        
+        setGoal({
+          ...data,
+          progress: progressPercent,
+          status
+        });
+      } catch (error: any) {
+        console.error("Error fetching goal:", error);
+        toast({
+          title: "Error loading goal",
+          description: error.message || "Could not load goal details",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchGoal();
+  }, [goalId, user, toast]);
+
+  const daysLeft = () => {
+    if (!goal) return 0;
+    const targetDate = new Date(goal.timeline);
+    const today = new Date();
+    const diffTime = targetDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
   
   if (!goal) {
     return (
@@ -99,14 +123,6 @@ const GoalDetail = () => {
     );
   }
 
-  const daysLeft = () => {
-    const targetDate = new Date(goal.timeline);
-    const today = new Date();
-    const diffTime = targetDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 ? diffDays : 0;
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -119,7 +135,7 @@ const GoalDetail = () => {
           </Link>
           <div>
             <h1 className="text-3xl font-bold">{goal.name}</h1>
-            <p className="text-muted-foreground">{goal.category} Goal • Created on {new Date(goal.createdAt).toLocaleDateString()}</p>
+            <p className="text-muted-foreground">{goal.category} Goal • Created on {new Date(goal.created_at).toLocaleDateString()}</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -144,22 +160,26 @@ const GoalDetail = () => {
         <Card>
           <CardContent className="p-4">
             <div className="text-muted-foreground text-sm mb-1">Saved</div>
-            <div className="font-bold text-2xl">₹{goal.current.toLocaleString()}</div>
+            <div className="font-bold text-2xl">₹{goal.current_amount.toLocaleString()}</div>
             <div className="text-xs text-muted-foreground mt-2">of ₹{goal.target.toLocaleString()}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-muted-foreground text-sm mb-1">Monthly</div>
-            <div className="font-bold text-2xl">₹{goal.monthlyContribution.toLocaleString()}</div>
-            <div className="text-xs text-muted-foreground mt-2">Contribution</div>
+            <div className="text-muted-foreground text-sm mb-1">Status</div>
+            <div className="font-bold text-2xl capitalize">
+              {goal.status === "ahead" && <span className="text-green-600">{goal.status}</span>}
+              {goal.status === "on-track" && <span className="text-blue-600">{goal.status}</span>}
+              {goal.status === "behind" && <span className="text-amber-600">{goal.status}</span>}
+            </div>
+            <div className="text-xs text-muted-foreground mt-2">Based on timeline</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <div className="text-muted-foreground text-sm mb-1">Time Left</div>
             <div className="font-bold text-2xl">{daysLeft()} days</div>
-            <div className="text-xs text-muted-foreground mt-2">Target: {goal.timeline}</div>
+            <div className="text-xs text-muted-foreground mt-2">Target: {new Date(goal.timeline).toLocaleDateString()}</div>
           </CardContent>
         </Card>
       </div>
@@ -169,7 +189,7 @@ const GoalDetail = () => {
         <TabsList className="mb-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
-          <TabsTrigger value="projections">Projections</TabsTrigger>
+          <TabsTrigger value="advisor">AI Advisor</TabsTrigger>
           <TabsTrigger value="tips">Tips & Insights</TabsTrigger>
         </TabsList>
         
@@ -180,19 +200,24 @@ const GoalDetail = () => {
               <CardDescription>Information about your financial goal</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="mb-4">{goal.description}</p>
+              <p className="mb-4">{goal.description || "No description provided."}</p>
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <h3 className="font-medium mb-2">Milestones</h3>
+                  <h3 className="font-medium mb-2">Goal Milestones</h3>
                   <ul className="space-y-2">
-                    {goal.milestones.map((milestone, index) => (
-                      <li key={index} className="flex items-center gap-2">
-                        <CheckCircle className={`h-4 w-4 ${goal.current >= milestone.amount ? 'text-green-500' : 'text-gray-300'}`} />
-                        <span className={goal.current >= milestone.amount ? 'line-through text-muted-foreground' : ''}>
-                          {milestone.label} - {new Date(milestone.date).toLocaleDateString()}
-                        </span>
-                      </li>
-                    ))}
+                    {[25, 50, 75, 100].map((milestone) => {
+                      const amount = (goal.target * (milestone / 100));
+                      const isComplete = goal.current_amount >= amount;
+                      
+                      return (
+                        <li key={milestone} className="flex items-center gap-2">
+                          <CheckCircle className={`h-4 w-4 ${isComplete ? 'text-green-500' : 'text-gray-300'}`} />
+                          <span className={isComplete ? 'line-through text-muted-foreground' : ''}>
+                            {milestone}% Complete - ₹{amount.toLocaleString()}
+                          </span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
                 <div>
@@ -200,7 +225,7 @@ const GoalDetail = () => {
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span>Due date: {goal.timeline}</span>
+                      <span>Due date: {new Date(goal.timeline).toLocaleDateString()}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-muted-foreground" />
@@ -208,14 +233,14 @@ const GoalDetail = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                      <span>Average return: {goal.returns}%</span>
+                      <span>Initial amount: ₹{goal.initial_amount.toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
               </div>
             </CardContent>
             <CardFooter className="border-t pt-4 flex justify-between">
-              <span className="text-sm text-muted-foreground">Last updated: {new Date().toLocaleDateString()}</span>
+              <span className="text-sm text-muted-foreground">Last updated: {new Date(goal.updated_at).toLocaleDateString()}</span>
               <Button variant="outline" size="sm">Download PDF Report</Button>
             </CardFooter>
           </Card>
@@ -229,17 +254,9 @@ const GoalDetail = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {goal.transactions.map((transaction, index) => (
-                  <div key={index} className="flex items-center justify-between border-b pb-2">
-                    <div>
-                      <p className="font-medium">{transaction.note}</p>
-                      <p className="text-sm text-muted-foreground">{new Date(transaction.date).toLocaleDateString()}</p>
-                    </div>
-                    <div className={`font-medium ${transaction.type === 'deposit' ? 'text-green-600' : 'text-red-600'}`}>
-                      {transaction.type === 'deposit' ? '+' : '-'}₹{transaction.amount.toLocaleString()}
-                    </div>
-                  </div>
-                ))}
+                <div className="flex items-center justify-center h-32 border border-dashed rounded-md">
+                  <p className="text-muted-foreground">No transactions yet</p>
+                </div>
               </div>
             </CardContent>
             <CardFooter className="border-t pt-4">
@@ -250,21 +267,8 @@ const GoalDetail = () => {
           </Card>
         </TabsContent>
         
-        <TabsContent value="projections" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Growth Projections</CardTitle>
-              <CardDescription>Expected growth based on current savings rate</CardDescription>
-            </CardHeader>
-            <CardContent className="flex justify-center py-4">
-              <div className="flex items-center justify-center h-[300px] w-full bg-muted/20 rounded-md border border-dashed">
-                <div className="text-center">
-                  <BarChart3 className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-muted-foreground">Chart showing projected growth over time</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="advisor" className="space-y-4">
+          <GoalAdvisor goalData={goal} />
         </TabsContent>
         
         <TabsContent value="tips" className="space-y-4">
