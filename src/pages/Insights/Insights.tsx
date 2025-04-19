@@ -132,7 +132,6 @@ const Insights = () => {
             <h3 className="font-medium">Active User</h3>
             <div className="p-4 border rounded-md">
               <p><strong>Name:</strong> {user?.name}</p>
-              <p><strong>Email:</strong> {user?.email}</p>
               <p><strong>ID:</strong> {user?.id}</p>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -146,3 +145,4 @@ const Insights = () => {
 };
 
 export default Insights;
+

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import {
   Card,
@@ -33,13 +32,16 @@ interface Goal {
   status: "on-track" | "ahead" | "behind";
   initial_amount: number;
   created_at: string;
+  user_id: string;
+  updated_at: string;
+  description: string | null;
 }
 
 const calculateProgress = (current: number, target: number) => {
   return Math.min(Math.round((current / target) * 100), 100);
 };
 
-const calculateStatus = (current: number, target: number, timeline: Date) => {
+const calculateStatus = (current: number, target: number, timeline: Date): "on-track" | "ahead" | "behind" => {
   const progress = calculateProgress(current, target);
   const now = new Date();
   const totalDuration = timeline.getTime() - new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).getTime();
@@ -83,7 +85,7 @@ const Goals = () => {
             ...goal,
             progress,
             status
-          };
+          } as Goal;
         });
 
         setGoals(processedGoals);

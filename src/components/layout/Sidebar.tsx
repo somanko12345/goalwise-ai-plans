@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -140,7 +141,7 @@ function SidebarNav({ isMobile = false, className }: SidebarNavProps) {
           </Avatar>
           <div>
             <p className="text-sm font-medium text-sidebar-foreground">{user?.name}</p>
-            <p className="text-xs text-sidebar-foreground/60">{user?.email}</p>
+            <p className="text-xs text-sidebar-foreground/60">User ID: {user?.id?.substring(0, 8)}</p>
           </div>
         </div>
         <div className="grid gap-2">
@@ -157,3 +158,4 @@ function SidebarNav({ isMobile = false, className }: SidebarNavProps) {
     </div>
   );
 }
+
