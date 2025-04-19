@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -24,15 +23,17 @@ import InvestmentSuggestions from "./pages/Investments/InvestmentSuggestions";
 import Insights from "./pages/Insights/Insights";
 import NotFound from "./pages/NotFound";
 import { useEffect } from "react";
+import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
 
-// Protected route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   
   if (loading) {
-    return <div className="flex justify-center items-center h-screen">Loading...</div>;
+    return <div className="flex justify-center items-center h-screen">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>;
   }
   
   if (!user) {
@@ -42,27 +43,24 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// This component wraps all routes and provides auth context
 const AppRoutes = () => {
   const { user, loading } = useAuth();
   
+  if (loading) {
+    return <div className="flex justify-center items-center h-screen">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>;
+  }
+
   return (
     <Routes>
-      {/* Redirect root to dashboard if logged in, otherwise to login */}
       <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} />} />
       
       {/* Auth Routes - accessible only when not logged in */}
       <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" />} />
       <Route path="/signup" element={!user ? <Signup /> : <Navigate to="/dashboard" />} />
       
-      {/* Onboarding - requires authentication */}
-      <Route path="/onboarding" element={
-        <ProtectedRoute>
-          <GoalSetup />
-        </ProtectedRoute>
-      } />
-      
-      {/* Dashboard Routes - all require authentication */}
+      {/* Protected Routes - require authentication */}
       <Route path="/" element={
         <ProtectedRoute>
           <DashboardLayout />
@@ -77,7 +75,6 @@ const AppRoutes = () => {
         <Route path="insights" element={<Insights />} />
       </Route>
       
-      {/* 404 Route */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

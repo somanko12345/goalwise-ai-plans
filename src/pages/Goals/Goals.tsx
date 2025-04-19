@@ -31,8 +31,8 @@ interface Goal {
   progress: number;
   status: "on-track" | "ahead" | "behind";
   initial_amount: number;
-  created_at: string;
   user_id: string;
+  created_at: string;
   updated_at: string;
   description: string | null;
 }
@@ -75,7 +75,6 @@ const Goals = () => {
 
         if (error) throw error;
 
-        // Process the data to calculate additional fields
         const processedGoals = data.map(goal => {
           const timelineDate = new Date(goal.timeline);
           const progress = calculateProgress(goal.current_amount, goal.target);
